@@ -30,6 +30,8 @@ class Operation
     /** @var Server[] */
     public array $servers = [];
 
+    public bool $deprecated = false;
+
     public function __construct(string $method)
     {
         $this->method = $method;
@@ -125,7 +127,9 @@ class Operation
 
     public function toArray()
     {
-        $result = [];
+        $result = [
+            'deprecated' => $this->deprecated
+        ];
 
         if ($this->operationId) {
             $result['operationId'] = $this->operationId;
