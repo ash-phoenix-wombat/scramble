@@ -11,6 +11,7 @@ use Dedoc\Scramble\Support\Generator\TypeTransformer;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use PHPStan\PhpDocParser\Ast\PhpDoc\PhpDocNode;
+use Throwable;
 
 class RulesToParameter
 {
@@ -36,9 +37,13 @@ class RulesToParameter
 
     public function generate()
     {
-        $rules = collect($this->rules)
-            ->map(fn ($v) => method_exists($v, '__toString') ? $v->__toString() : $v)
-            ->sortByDesc($this->rulesSorter());
+        try {
+            $rules = collect($this->rules)
+                ->map(fn ($v) => method_exists($v, '__toString') ? $v->__toString() : $v)
+                ->sortByDesc($this->rulesSorter());
+        } catch (Throwable) {
+            $rules = collect($this->rules)->sortByDesc($this->rulesSorter());
+        }
 
         $type = $rules->reduce(function (OpenApiType $type, $rule) {
             if (is_string($rule)) {
@@ -55,8 +60,13 @@ class RulesToParameter
 
         $parameter = Parameter::make($this->name, 'query')
             ->setSchema(Schema::fromType($type))
-            ->required($rules->contains('required'))
             ->description($description);
+
+        try {
+            $parameter->required($rules->contains('required'));
+        } catch (Throwable) {
+            //Ignore
+        }
 
         return $this->applyDocsInfo($parameter);
     }
@@ -104,6 +114,8 @@ class RulesToParameter
             $parameter->setSchema(Schema::fromType(
                 $this->openApiTransformer->transform(PhpDocTypeHelper::toType($varTag->type)),
             ));
+
+            $parameter->description($varTag->description);
         }
 
         return $parameter;

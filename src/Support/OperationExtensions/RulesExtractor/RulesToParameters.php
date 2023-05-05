@@ -15,6 +15,7 @@ use Illuminate\Support\Str;
 use PhpParser\Node;
 use PhpParser\NodeFinder;
 use PHPStan\PhpDocParser\Ast\PhpDoc\PhpDocNode;
+use Throwable;
 
 class RulesToParameters
 {
@@ -91,11 +92,15 @@ class RulesToParameters
 
     private function handleConfirmed(Collection $parameters)
     {
-        $confirmedParamNameRules = collect($this->rules)
-            ->map(fn ($rules, $name) => [$name, Arr::wrap(is_string($rules) ? explode('|', $rules) : $rules)])
-            ->first(fn ($nameRules) => in_array('confirmed', $nameRules[1]));
+        try {
+            $confirmedParamNameRules = collect($this->rules)
+                ->map(fn ($rules, $name) => [$name, Arr::wrap(is_string($rules) ? explode('|', $rules) : $rules)])
+                ->first(fn ($nameRules) => in_array('confirmed', $nameRules[1]));
+        } catch (Throwable) {
+            return $parameters;
+        }
 
-        if (! $confirmedParamNameRules) {
+        if (!$confirmedParamNameRules) {
             return $parameters;
         }
 

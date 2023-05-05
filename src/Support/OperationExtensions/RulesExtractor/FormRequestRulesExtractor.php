@@ -31,10 +31,20 @@ class FormRequestRulesExtractor
             ->contains(\Closure::fromCallable([$this, 'findCustomRequestParam']));
     }
 
-    public function node()
+    public function nodes()
     {
-        $requestClassName = $this->getFormRequestClassName();
+        $requestClassNames = $this->getFormRequestClassNames();
+        $nodes = [];
 
+        foreach ($requestClassNames as $requestClassName) {
+            $nodes[] = $this->node($requestClassName);
+        }
+
+        return $nodes;
+    }
+
+    protected function node(string $requestClassName)
+    {
         $result = resolve(FileParser::class)->parse((new ReflectionClass($requestClassName))->getFileName());
 
         /** @var Node\Stmt\ClassMethod|null $rulesMethodNode */
@@ -54,12 +64,21 @@ class FormRequestRulesExtractor
 
     public function extract(Route $route)
     {
-        $requestClassName = $this->getFormRequestClassName();
+        $requestClassNames = $this->getFormRequestClassNames();
+        $requestRules = [];
 
+        foreach ($requestClassNames as $requestClassName) {
+            $requestRules = array_merge($requestRules, $this->extractRules($route, $requestClassName));
+        }
+
+        return $requestRules;
+    }
+
+    protected function extractRules(Route $route, string $requestClassName)
+    {
         /** @var Request $request */
-        $request = (new $requestClassName);
+        $request = new $requestClassName();
         $request->setMethod($route->methods()[0]);
-
         return $request->rules();
     }
 
@@ -70,11 +89,10 @@ class FormRequestRulesExtractor
         return method_exists($className, 'rules');
     }
 
-    private function getFormRequestClassName()
+    private function getFormRequestClassNames()
     {
-        $requestParam = collect($this->handler->getParams())
-            ->first(\Closure::fromCallable([$this, 'findCustomRequestParam']));
-
-        return (string) $requestParam->type;
+        $requestParams = collect($this->handler->getParams())
+            ->filter(\Closure::fromCallable([$this, 'findCustomRequestParam']));
+        return $requestParams->map(fn ($requestParam) => (string) $requestParam->type)->toArray();
     }
 }
