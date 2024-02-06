@@ -16,6 +16,9 @@ class OpenApi
     /** @var Path[] */
     public array $paths = [];
 
+    /** @var Path[] */
+    public array $webhookPaths = [];
+
     private ?Security $defaultSecurity = null;
 
     public function __construct(string $version)
@@ -72,6 +75,12 @@ class OpenApi
         return $this;
     }
 
+    public function addWebhookPath(Path $path)
+    {
+        $this->webhookPaths[] = $path;
+        return $this;
+    }
+
     public function addServer(Server $server)
     {
         $this->servers[] = $server;
@@ -115,6 +124,20 @@ class OpenApi
             }
 
             $result['paths'] = $paths;
+        }
+
+        if (count($this->webhookPaths)) {
+            $webhookPaths = [];
+
+            foreach ($this->webhookPaths as $pathBuilder) {
+                // var_dump($pathBuilder->toArray());exit;
+                $webhookPaths['/' . $pathBuilder->path] = array_merge(
+                    $webhookPaths['/' . $pathBuilder->path] ?? [],
+                    $pathBuilder->toArray(),
+                );
+            }
+
+            $result['webhooks'] = $webhookPaths;
         }
 
         if (count($serializedComponents = $this->components->toArray())) {

@@ -49,30 +49,28 @@ class Generator
     {
         $openApi = $this->makeOpenApi();
 
-        $this->getRoutes()
-            ->map(function (Route $route) use ($openApi) {
-                try {
-                    return $this->routeToOperation($openApi, $route);
-                } catch (Throwable $e) {
-                    if (config('app.debug', false)) {
-                        $method = $route->methods()[0];
-                        $action = $route->getAction('uses');
+        $apiPath = config('scramble.api_path', 'api');
+        $webhookPath = config('scramble.webhook_path', 'webhooks');
 
-                        logger()->error("Error when analyzing route '$method $route->uri' ($action): {$e->getMessage()} – ".($e->getFile().' on line '.$e->getLine()));
-                    }
-
-                    throw $e;
-                }
-            })
-            ->filter() // Closure based routes are filtered out for now, right here
-            ->each(fn (Operation $operation) => $openApi->addPath(
+        $this->routesToOperations($openApi, $this->getRoutes($apiPath))->each(
+            fn (Operation $operation) => $openApi->addPath(
                 Path::make(
                     (string) Str::of($operation->path)
                         ->replaceFirst(config('scramble.api_path', 'api'), '')
                         ->trim('/')
                 )->addOperation($operation)
-            ))
-            ->toArray();
+            )
+        );
+
+        $this->routesToOperations($openApi, $this->getRoutes($webhookPath))->each(
+            fn (Operation $operation) => $openApi->addWebhookPath(
+                Path::make(
+                    (string) Str::of($operation->path)
+                        ->replaceFirst(config('scramble.api_path', 'api'), '')
+                        ->trim('/')
+                )->addOperation($operation)
+            )
+        );
 
         $this->moveSameAlternativeServersToPath($openApi);
 
@@ -108,7 +106,7 @@ class Generator
         return $openApi;
     }
 
-    private function getRoutes(): Collection
+    private function getRoutes(string $path): Collection
     {
         return collect(RouteFacade::getRoutes())
             ->pipe(function (Collection $c) {
@@ -133,18 +131,39 @@ class Generator
             ->filter(function (Route $route) {
                 return ! ($name = $route->getAction('as')) || ! Str::startsWith($name, 'scramble');
             })
-            ->filter(function (Route $route) {
-                $routeResolver = Scramble::$routeResolver ?? function (Route $route) {
+            ->filter(function (Route $route) use ($path) {
+                $routeResolver = Scramble::$routeResolver ?? function (Route $route, string $path) {
                     $expectedDomain = config('scramble.api_domain');
 
-                    return Str::startsWith($route->uri, config('scramble.api_path', 'api'))
+                    return Str::startsWith($route->uri, $path)
                         && (! $expectedDomain || $route->getDomain() === $expectedDomain);
                 };
 
-                return $routeResolver($route);
+                return $routeResolver($route, $path);
             })
             ->filter(fn (Route $r) => $r->getAction('controller'))
             ->values();
+    }
+
+    private function routesToOperations(OpenApi $openApi, Collection $routes): Collection
+    {
+        $operations = $routes->map(function (Route $route) use ($openApi) {
+            try {
+                return $this->routeToOperation($openApi, $route);
+            } catch (Throwable $e) {
+                if (config('app.debug', false)) {
+                    $method = $route->methods()[0];
+                    $action = $route->getAction('uses');
+
+                    logger()->error("Error when analyzing route '$method $route->uri' ($action): {$e->getMessage()} – ".($e->getFile().' on line '.$e->getLine()));
+                }
+
+                throw $e;
+            }
+        });
+
+        // Closure based routes are filtered out for now, right here
+        return $operations->filter();
     }
 
     private function routeToOperation(OpenApi $openApi, Route $route)
