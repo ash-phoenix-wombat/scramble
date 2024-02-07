@@ -9,6 +9,7 @@ use Dedoc\Scramble\Support\Generator\Types\StringType;
 use Dedoc\Scramble\Support\Generator\Types\UnknownType;
 use Dedoc\Scramble\Support\Type\ObjectType;
 use Dedoc\Scramble\Support\Type\Type;
+use ReflectionClass;
 
 class EnumToSchema extends TypeToSchemaExtension
 {
@@ -40,6 +41,13 @@ class EnumToSchema extends TypeToSchemaExtension
 
     public function reference(ObjectType $type)
     {
-        return new Reference('schemas', $type->name, $this->components);
+        $reflection = new ReflectionClass($type->name);
+        $enumName = 'Enum - ' .  str_replace('Enum', '', $reflection->getShortName());
+
+        return new Reference(
+            'schemas',
+            ucwords(implode(' ', preg_split('/(?=[A-Z])/', $enumName))),
+            $this->components
+        );
     }
 }
