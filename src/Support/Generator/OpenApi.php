@@ -137,7 +137,7 @@ class OpenApi
                 );
             }
 
-            $result['webhooks'] = $webhookPaths;
+            $result['webhooks'] = collect($webhookPaths)->sortKeys()->toArray();
         }
 
         if (count($serializedComponents = $this->components->toArray())) {
