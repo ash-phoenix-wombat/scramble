@@ -42,7 +42,7 @@ class EnumToSchema extends TypeToSchemaExtension
     public function reference(ObjectType $type)
     {
         $reflection = new ReflectionClass($type->name);
-        $enumName = 'Enum - ' .  str_replace('Enum', '', $reflection->getShortName());
+        $enumName = str_replace('Enum', '', $reflection->getShortName());
 
         return new Reference(
             'schemas',
