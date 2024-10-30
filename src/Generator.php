@@ -91,12 +91,21 @@ class Generator
                     ->setDescription(config('scramble.info.description', ''))
             );
 
-        [$defaultProtocol] = explode('://', url('/'));
-        $servers = config('scramble.servers') ?: [
-            '' => ($domain = config('scramble.api_domain'))
-                ? $defaultProtocol.'://'.$domain.'/'.config('scramble.api_path', 'api')
-                : config('scramble.api_path', 'api'),
-        ];
+        $servers = config('scramble.servers');
+
+        if (!$servers) {
+            $domain = config('scramble.api_domain', '');
+
+            if ($domain) {
+                if (!str_contains($domain, '://')) {
+                    [$defaultProtocol] = explode('://', url('/'));
+                    $domain = $defaultProtocol . '://' . $domain;
+                }
+            }
+
+            $servers[''] = $domain . '/' . config('scramble.api_path', 'api');
+        }
+
         foreach ($servers as $description => $url) {
             $openApi->addServer(
                 $this->serverFactory->make(url($url ?: '/'), $description)
